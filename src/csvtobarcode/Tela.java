@@ -20,6 +20,9 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import javax.imageio.ImageIO;
@@ -37,14 +40,14 @@ public class Tela extends javax.swing.JFrame implements Runnable {
     /**
      * Creates new form Tela
      */
-    boolean qr = false;
+    boolean qr = true;
     String separador = "\\;";
-
+    
     public Tela() {
-        try{
+        try {
             
             UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
-        }catch(Exception e){
+        } catch (Exception e) {
             e.printStackTrace();
         }
         initComponents();
@@ -96,7 +99,7 @@ public class Tela extends javax.swing.JFrame implements Runnable {
 
         jLabel2.setBackground(new java.awt.Color(153, 0, 51));
         jLabel2.setForeground(new java.awt.Color(153, 0, 0));
-        jLabel2.setText("Peca | Qualidade | Sequencia | Data");
+        jLabel2.setText("Codigo (minimo 26 caracteres)");
 
         jLabel3.setText("Linhas geradas com sucesso:");
 
@@ -106,7 +109,7 @@ public class Tela extends javax.swing.JFrame implements Runnable {
 
         jLabel6.setText("...");
 
-        comboBoxTipoBAR.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "Código de barras", "QR Code" }));
+        comboBoxTipoBAR.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "QR Code" }));
         comboBoxTipoBAR.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 comboBoxTipoBARActionPerformed(evt);
@@ -219,22 +222,22 @@ public class Tela extends javax.swing.JFrame implements Runnable {
     }//GEN-LAST:event_jButton1MouseClicked
 
     private void comboBoxTipoBARActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_comboBoxTipoBARActionPerformed
-        String selected = (String)comboBoxTipoBAR.getSelectedItem();
-        if(selected.equals("QR Code")){
+        String selected = (String) comboBoxTipoBAR.getSelectedItem();
+        if (selected.equals("QR Code")) {
             qr = true;
-        }else{
+        } else {
             qr = false;
         }
     }//GEN-LAST:event_comboBoxTipoBARActionPerformed
 
     private void comboBoxSeparadorActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_comboBoxSeparadorActionPerformed
-        if(comboBoxSeparador.getSelectedIndex() == 0){  // ponto e virgula;
+        if (comboBoxSeparador.getSelectedIndex() == 0) {  // ponto e virgula;
             separador = "\\;";
-        }else{
+        } else {
             separador = "\\,";
         }
     }//GEN-LAST:event_comboBoxSeparadorActionPerformed
-
+    
     @Override
     public void run() {
         System.out.println("Executando: " + this.arquivo);
@@ -243,26 +246,17 @@ public class Tela extends javax.swing.JFrame implements Runnable {
             int qntd = 0;
             String html = "<!DOCTYPE html><html><head> <meta charset=\"UTF-8\"><link rel=\"stylesheet\" type=\"text/css\" href=\"theme.css\">"
                     + "\n"
-                    + "</head><body><table><tr><th>PeCa</th><th>Qualidade</th><th>Sequencia</th><th>Data</th><th>Codigo</th><th>Imagem</th></tr>";
+                    + "</head><body><table><tr><th>Codigo</th></tr>";
             BufferedReader reader;
             try {
                 reader = new BufferedReader(new FileReader(arquivo));
                 String line = reader.readLine();
                 while (line != null) {
                     html += "<tr>";
-                    String peca = line.split(separador)[0];
-                    String qualidade = line.split(separador)[1];
-                    String sequencia = line.split(separador)[2];
-                    String data = line.split(separador)[3];
-                    
-                    // read next line
-                    String codigo = peca + qualidade + sequencia + data;
-
-                    html += "<td>" + peca + "</td>";
-                    html += "<td>" + qualidade + "</td>";
-                    html += "<td>" + sequencia + "</td>";
-                    html += "<td>" + data + "</td>";
-                    html += "<td>" + codigo + "</td>";
+                    String codigo = line.split(separador)[0];
+                    if (codigo.length() > 26) {
+                        codigo = codigo.substring(0, 26);
+                    }
                     String b64 = "";
                     if (!qr) {
                         b64 = saveBarCode(pasta, codigo);
@@ -271,10 +265,16 @@ public class Tela extends javax.swing.JFrame implements Runnable {
                         b64 = saveQrCode(pasta, codigo);
                     }
                     
-                    html += "<td class='td-image'><img width='250px' src='data:image/png;base64, " + b64 + "'></td>";
+                    String codigo1 = codigo.substring(0, 11);
+                    String codigo2 = codigo.substring(11, 16);
+                    String codigo3 = codigo.substring(16, 21);
+                    String codigo4 = codigo.substring(21, 26);
+                    
+                    html += "<td class='td-image'><p><img src='data:image/png;base64, " + b64 + "' align='left'><span>" + String.format("%s<br>%s<br>%s<br>%s", codigo1, codigo2, codigo3, codigo4) + "</span></p></td><td><span>" + (qntd + 1) + "</td>";
                     html += "</tr>";
                     qntd++;
                     jLabel4.setText(qntd + "");
+                    Thread.sleep(100);
                     line = reader.readLine();
                 }
                 reader.close();
@@ -303,7 +303,7 @@ public class Tela extends javax.swing.JFrame implements Runnable {
             e.printStackTrace();
         }
     }
-
+    
     public String saveBarCode(String pasta, String codigo) {
         try {
             Code128Bean code128 = new Code128Bean();
@@ -327,20 +327,23 @@ public class Tela extends javax.swing.JFrame implements Runnable {
         }
         return "";
     }
-
+    
     public String saveQrCode(String pasta, String codigo) {
         Map<EncodeHintType, Object> hints = new HashMap<>();
         BarcodeQRCode qr = new BarcodeQRCode(codigo, 300, 300, hints);
         Image image = qr.createAwtImage(Color.BLACK, Color.WHITE);
-
+        
         BufferedImage bi = new BufferedImage(300, 300, BufferedImage.TYPE_INT_RGB);
         Graphics g = bi.getGraphics();
         try {
             g.drawImage(image, 0, 0, null);
-            File f = new File(pasta + "\\imagens\\" + codigo + ".png");
+            Date d = new Date();
+            DateFormat df = new SimpleDateFormat("dd-MM-yyyy-HH-mm-ss");
+            
+            File f = new File(pasta + "\\imagens\\" + codigo + "_" + df.format(d) + ".png");
             ImageIO.write(bi, "png", f);
             return encodeFileToBase64Binary(f);
-
+            
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -348,7 +351,7 @@ public class Tela extends javax.swing.JFrame implements Runnable {
         //ImageIO.write(bufferedImage, "jpg", new File("C:\\myImage.jpg"));
         return "";
     }
-
+    
     private static String encodeFileToBase64Binary(File file) {
         String encodedfile = null;
         try {
@@ -363,10 +366,10 @@ public class Tela extends javax.swing.JFrame implements Runnable {
             // TODO Auto-generated catch block
             e.printStackTrace();
         }
-
+        
         return encodedfile;
     }
-
+    
     public void lerArquivo(String arquivo) {
         System.out.println("Lendo arquivo");
         new Thread(this).start();
