@@ -5,15 +5,26 @@
  */
 package csvtobarcode;
 
+import com.itextpdf.text.pdf.BarcodeQRCode;
 import com.itextpdf.text.pdf.codec.Base64;
+import com.itextpdf.text.pdf.qrcode.EncodeHintType;
+import java.awt.Color;
+import java.awt.Graphics;
+import java.awt.Image;
 import java.awt.image.BufferedImage;
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+import javax.imageio.ImageIO;
 import javax.swing.JFileChooser;
+import javax.swing.UIManager;
 import org.krysalis.barcode4j.impl.code128.Code128Bean;
 import org.krysalis.barcode4j.output.bitmap.BitmapCanvasProvider;
 
@@ -26,11 +37,23 @@ public class Tela extends javax.swing.JFrame implements Runnable {
     /**
      * Creates new form Tela
      */
+    boolean qr = false;
+    String separador = "\\;";
+
     public Tela() {
+        try{
+            
+            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+        }catch(Exception e){
+            e.printStackTrace();
+        }
         initComponents();
         try {
+            comboBoxSeparador.addItem("Virgula ( , )");
             String pasta = new File(Tela.class.getProtectionDomain().getCodeSource().getLocation().toURI()).getParent();
             jLabel6.setText(pasta);
+            comboBoxTipoBAR.setFocusable(false);
+            comboBoxSeparador.setFocusable(false);
         } catch (Exception e) {
         }
     }
@@ -53,6 +76,10 @@ public class Tela extends javax.swing.JFrame implements Runnable {
         jLabel4 = new javax.swing.JLabel();
         jLabel5 = new javax.swing.JLabel();
         jLabel6 = new javax.swing.JLabel();
+        comboBoxTipoBAR = new javax.swing.JComboBox<>();
+        jLabel7 = new javax.swing.JLabel();
+        jLabel8 = new javax.swing.JLabel();
+        comboBoxSeparador = new javax.swing.JComboBox<>();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
 
@@ -67,6 +94,8 @@ public class Tela extends javax.swing.JFrame implements Runnable {
 
         jLabel1.setText("Atenção: carregue um csv com os seguintes campos:");
 
+        jLabel2.setBackground(new java.awt.Color(153, 0, 51));
+        jLabel2.setForeground(new java.awt.Color(153, 0, 0));
         jLabel2.setText("Peca | Qualidade | Sequencia | Data");
 
         jLabel3.setText("Linhas geradas com sucesso:");
@@ -77,25 +106,45 @@ public class Tela extends javax.swing.JFrame implements Runnable {
 
         jLabel6.setText("...");
 
+        comboBoxTipoBAR.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "Código de barras", "QR Code" }));
+        comboBoxTipoBAR.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                comboBoxTipoBARActionPerformed(evt);
+            }
+        });
+
+        jLabel7.setText("Tipo de código de barras:");
+
+        jLabel8.setText("Separador do CSV:");
+
+        comboBoxSeparador.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "Ponto e virgula ( ; )" }));
+        comboBoxSeparador.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                comboBoxSeparadorActionPerformed(evt);
+            }
+        });
+
         javax.swing.GroupLayout jPanel1Layout = new javax.swing.GroupLayout(jPanel1);
         jPanel1.setLayout(jPanel1Layout);
         jPanel1Layout.setHorizontalGroup(
             jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel1Layout.createSequentialGroup()
                 .addContainerGap(70, Short.MAX_VALUE)
+                .addComponent(jLabel1)
+                .addGap(25, 25, 25))
+            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel1Layout.createSequentialGroup()
+                .addGap(0, 0, Short.MAX_VALUE)
                 .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel1Layout.createSequentialGroup()
-                        .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                            .addComponent(jLabel2)
-                            .addComponent(jButton1, javax.swing.GroupLayout.PREFERRED_SIZE, 188, javax.swing.GroupLayout.PREFERRED_SIZE))
-                        .addGap(93, 93, 93))
+                        .addComponent(jLabel2)
+                        .addGap(87, 87, 87))
                     .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel1Layout.createSequentialGroup()
-                        .addComponent(jLabel1)
-                        .addGap(25, 25, 25))))
+                        .addComponent(jButton1, javax.swing.GroupLayout.PREFERRED_SIZE, 188, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addGap(104, 104, 104))))
             .addGroup(jPanel1Layout.createSequentialGroup()
-                .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
                     .addGroup(jPanel1Layout.createSequentialGroup()
-                        .addGap(28, 28, 28)
+                        .addGap(30, 30, 30)
                         .addComponent(jLabel3)
                         .addGap(47, 47, 47)
                         .addComponent(jLabel4))
@@ -103,8 +152,19 @@ public class Tela extends javax.swing.JFrame implements Runnable {
                         .addContainerGap()
                         .addComponent(jLabel5)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addComponent(jLabel6)))
-                .addGap(0, 0, Short.MAX_VALUE))
+                        .addComponent(jLabel6))
+                    .addGroup(jPanel1Layout.createSequentialGroup()
+                        .addContainerGap()
+                        .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                            .addComponent(comboBoxTipoBAR, 0, 295, Short.MAX_VALUE)
+                            .addComponent(jLabel7)))
+                    .addGroup(jPanel1Layout.createSequentialGroup()
+                        .addContainerGap()
+                        .addComponent(jLabel8))
+                    .addGroup(jPanel1Layout.createSequentialGroup()
+                        .addContainerGap()
+                        .addComponent(comboBoxSeparador, 0, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)))
+                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
         jPanel1Layout.setVerticalGroup(
             jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -115,15 +175,23 @@ public class Tela extends javax.swing.JFrame implements Runnable {
                     .addComponent(jLabel6))
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                 .addComponent(jLabel1)
-                .addGap(18, 18, 18)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(jLabel2)
-                .addGap(18, 18, 18)
+                .addGap(29, 29, 29)
+                .addComponent(jLabel7)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addComponent(comboBoxTipoBAR, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addGap(30, 30, 30)
+                .addComponent(jLabel8)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addComponent(comboBoxSeparador, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 85, Short.MAX_VALUE)
                 .addComponent(jButton1)
-                .addGap(34, 34, 34)
+                .addGap(18, 18, 18)
                 .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(jLabel3)
                     .addComponent(jLabel4))
-                .addContainerGap(121, Short.MAX_VALUE))
+                .addGap(52, 52, 52))
         );
 
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
@@ -150,49 +218,60 @@ public class Tela extends javax.swing.JFrame implements Runnable {
         }
     }//GEN-LAST:event_jButton1MouseClicked
 
+    private void comboBoxTipoBARActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_comboBoxTipoBARActionPerformed
+        String selected = (String)comboBoxTipoBAR.getSelectedItem();
+        if(selected.equals("QR Code")){
+            qr = true;
+        }else{
+            qr = false;
+        }
+    }//GEN-LAST:event_comboBoxTipoBARActionPerformed
+
+    private void comboBoxSeparadorActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_comboBoxSeparadorActionPerformed
+        if(comboBoxSeparador.getSelectedIndex() == 0){  // ponto e virgula;
+            separador = "\\;";
+        }else{
+            separador = "\\,";
+        }
+    }//GEN-LAST:event_comboBoxSeparadorActionPerformed
+
     @Override
     public void run() {
         System.out.println("Executando: " + this.arquivo);
         try {
             String pasta = new File(Tela.class.getProtectionDomain().getCodeSource().getLocation().toURI()).getParent();
             int qntd = 0;
-            String html = "<!DOCTYPE html><html><head> <meta charset=\"UTF-8\"><style>table, th, td {\n"
-                    + "   border: 1px solid black;\n"
-                    + "}</style> </head><body><table><tr><td>Peça</td><td>Qualidade</td><td>Sequencia</td><td>Data</td><td>Codigo</td><td>Imagem</td></tr>";
+            String html = "<!DOCTYPE html><html><head> <meta charset=\"UTF-8\"><link rel=\"stylesheet\" type=\"text/css\" href=\"theme.css\">"
+                    + "\n"
+                    + "</head><body><table><tr><th>PeCa</th><th>Qualidade</th><th>Sequencia</th><th>Data</th><th>Codigo</th><th>Imagem</th></tr>";
             BufferedReader reader;
             try {
                 reader = new BufferedReader(new FileReader(arquivo));
                 String line = reader.readLine();
                 while (line != null) {
                     html += "<tr>";
-                    String peca = line.split("\\;")[0];
-                    String qualidade = line.split("\\;")[1];
-                    String sequencia = line.split("\\;")[2];
-                    String data = line.split("\\;")[3];
+                    String peca = line.split(separador)[0];
+                    String qualidade = line.split(separador)[1];
+                    String sequencia = line.split(separador)[2];
+                    String data = line.split(separador)[3];
+                    
                     // read next line
                     String codigo = peca + qualidade + sequencia + data;
-                    Code128Bean code128 = new Code128Bean();
-                    code128.setHeight(15f);
-                    code128.setModuleWidth(0.3);
-                    code128.setQuietZone(10);
-                    code128.doQuietZone(true);
-                    ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                    BitmapCanvasProvider canvas = new BitmapCanvasProvider(baos, "image/x-png", 300, BufferedImage.TYPE_BYTE_BINARY, false, 0);
-                    code128.generateBarcode(canvas, codigo);
-                    canvas.finish();
-                    //write to png file
-                    FileOutputStream fos = new FileOutputStream(pasta + "\\imagens\\" + codigo + ".png");
-                    fos.write(baos.toByteArray());
-                    String b64 = Base64.encodeFromFile(pasta + "\\imagens\\" + codigo + ".png");
-                    fos.flush();
-                    fos.close();
 
                     html += "<td>" + peca + "</td>";
                     html += "<td>" + qualidade + "</td>";
                     html += "<td>" + sequencia + "</td>";
                     html += "<td>" + data + "</td>";
                     html += "<td>" + codigo + "</td>";
-                    html += "<td><img style='padding-top: 10px;' width='250px' src='data:image/png;base64, " + b64 + "'></td>";
+                    String b64 = "";
+                    if (!qr) {
+                        b64 = saveBarCode(pasta, codigo);
+                    } else {
+                        // salvar com qr code
+                        b64 = saveQrCode(pasta, codigo);
+                    }
+                    
+                    html += "<td class='td-image'><img width='250px' src='data:image/png;base64, " + b64 + "'></td>";
                     html += "</tr>";
                     qntd++;
                     jLabel4.setText(qntd + "");
@@ -221,7 +300,71 @@ public class Tela extends javax.swing.JFrame implements Runnable {
             // fim
         } catch (Exception e) {
             // TODO: handle exception
+            e.printStackTrace();
         }
+    }
+
+    public String saveBarCode(String pasta, String codigo) {
+        try {
+            Code128Bean code128 = new Code128Bean();
+            code128.setHeight(15f);
+            code128.setModuleWidth(0.3);
+            code128.setQuietZone(10);
+            code128.doQuietZone(true);
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            BitmapCanvasProvider canvas = new BitmapCanvasProvider(baos, "image/x-png", 300, BufferedImage.TYPE_BYTE_BINARY, false, 0);
+            code128.generateBarcode(canvas, codigo);
+            canvas.finish();
+            //write to png file
+            FileOutputStream fos = new FileOutputStream(pasta + "\\imagens\\" + codigo + ".png");
+            fos.write(baos.toByteArray());
+            String b64 = Base64.encodeFromFile(pasta + "\\imagens\\" + codigo + ".png");
+            fos.flush();
+            fos.close();
+            return b64;
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return "";
+    }
+
+    public String saveQrCode(String pasta, String codigo) {
+        Map<EncodeHintType, Object> hints = new HashMap<>();
+        BarcodeQRCode qr = new BarcodeQRCode(codigo, 300, 300, hints);
+        Image image = qr.createAwtImage(Color.BLACK, Color.WHITE);
+
+        BufferedImage bi = new BufferedImage(300, 300, BufferedImage.TYPE_INT_RGB);
+        Graphics g = bi.getGraphics();
+        try {
+            g.drawImage(image, 0, 0, null);
+            File f = new File(pasta + "\\imagens\\" + codigo + ".png");
+            ImageIO.write(bi, "png", f);
+            return encodeFileToBase64Binary(f);
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        //image.getGraphics().drawImage(toolkitImage, 0, 0, null);
+        //ImageIO.write(bufferedImage, "jpg", new File("C:\\myImage.jpg"));
+        return "";
+    }
+
+    private static String encodeFileToBase64Binary(File file) {
+        String encodedfile = null;
+        try {
+            FileInputStream fileInputStreamReader = new FileInputStream(file);
+            byte[] bytes = new byte[(int) file.length()];
+            fileInputStreamReader.read(bytes);
+            encodedfile = Base64.encodeBytes(bytes).toString();
+        } catch (FileNotFoundException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+
+        return encodedfile;
     }
 
     public void lerArquivo(String arquivo) {
@@ -266,6 +409,8 @@ public class Tela extends javax.swing.JFrame implements Runnable {
     }
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
+    private javax.swing.JComboBox<String> comboBoxSeparador;
+    private javax.swing.JComboBox<String> comboBoxTipoBAR;
     private javax.swing.JButton jButton1;
     private javax.swing.JLabel jLabel1;
     private javax.swing.JLabel jLabel2;
@@ -273,6 +418,8 @@ public class Tela extends javax.swing.JFrame implements Runnable {
     private javax.swing.JLabel jLabel4;
     private javax.swing.JLabel jLabel5;
     private javax.swing.JLabel jLabel6;
+    private javax.swing.JLabel jLabel7;
+    private javax.swing.JLabel jLabel8;
     private javax.swing.JPanel jPanel1;
     // End of variables declaration//GEN-END:variables
 }
